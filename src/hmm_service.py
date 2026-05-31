@@ -1,35 +1,13 @@
-import datetime
-import ccxt
 import pandas as pd
 import numpy as np
 from hmmlearn.hmm import GaussianHMM
 from sklearn.preprocessing import RobustScaler
 from config import HMM_CONFIG
+from ohlcv_loader import load_ohlcv
 
 def calculate_realtime_hmm_score(symbol: str) -> int:
-    exchange = ccxt.binance({'enableRateLimit': True})
-    formatted_symbol = symbol.replace("/", "") if "/" in symbol else symbol
-    
-    now_utc = datetime.datetime.now(datetime.timezone.utc)
-    start_ts = int((now_utc - datetime.timedelta(days=HMM_CONFIG['FETCH_DAYS'])).timestamp() * 1000)
-    end_ts = int(now_utc.timestamp() * 1000)
-    
-    all_ohlcv = []
-    current_ts = start_ts
-    
-    while current_ts < end_ts:
-        try:
-            ohlcv = exchange.fetch_ohlcv(formatted_symbol, HMM_CONFIG['TIMEFRAME'], since=current_ts, limit=1000)
-            if not ohlcv:
-                break
-            all_ohlcv.extend(ohlcv)
-            current_ts = ohlcv[-1][0] + 1
-            if len(ohlcv) < 1000:
-                break
-        except Exception as e:
-            print(f"CCXT Fetch Error: {e}")
-            break
-            
+    all_ohlcv = load_ohlcv(symbol)
+
     df = pd.DataFrame(all_ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
     df.set_index('timestamp', inplace=True)
