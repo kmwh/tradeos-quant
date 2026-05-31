@@ -10,7 +10,11 @@ app = FastAPI(title="TradeOS Quant API", version="1.0.0")
 
 @app.get("/api/v1/hmm/predict", response_model=HmmResponse)
 def get_latest_hmm_score(symbol: str = "BTC/USDT"):
-    now = datetime.datetime.now()
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    aligned_hour = (now_utc.hour // 4) * 4
+    aligned_utc = now_utc.replace(hour=aligned_hour, minute=0, second=0, microsecond=0)
+    
+    aligned_local = aligned_utc.astimezone().replace(tzinfo=None)
     
     try:
         score = calculate_realtime_hmm_score(symbol)
@@ -19,7 +23,7 @@ def get_latest_hmm_score(symbol: str = "BTC/USDT"):
         score = 50 
         
     return HmmResponse(
-        timestamp=now.isoformat(),
+        timestamp=aligned_local.isoformat(),
         symbol=symbol,
         trend_score=score
     )
