@@ -7,10 +7,15 @@ class HmmResponse(BaseModel):
     trend_score: int
 
 class JournalData(BaseModel):
+    ticker: str
+    position: str
+    leverage: float
     entry_reason: str
     exit_reason: str
     emotion: str
     pnl: float
+    roi: float
+    duration_seconds: int
     hmm_score: int
 
 class PerformanceRequest(BaseModel):
