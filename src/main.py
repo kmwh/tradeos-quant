@@ -34,5 +34,4 @@ def analyze_performance(request: PerformanceRequest):
         return {"summary_text": "평가 중 오류가 발생했습니다."}
 
 if __name__ == "__main__":
-    # 서버 실행 시 이제 inference_api 대신 main.py를 실행합니다.
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
