@@ -11,6 +11,7 @@ class JournalData(BaseModel):
     exit_reason: str
     emotion: str
     pnl: float
+    hmm_score: int
 
 class PerformanceRequest(BaseModel):
     batch_size: int
