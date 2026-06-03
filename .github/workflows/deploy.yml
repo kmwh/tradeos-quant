@@ -32,5 +32,5 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd ~/tradeos-server
-            sudo docker-compose pull tradeos-quant
-            sudo docker-compose up -d tradeos-quant
+            sudo docker compose pull tradeos-quant
+            sudo docker compose up -d tradeos-quant
