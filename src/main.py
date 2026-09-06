@@ -9,7 +9,7 @@ from ai_service import analyze_trading_performance
 app = FastAPI(title="TradeOS Quant API", version="1.0.0")
 
 @app.get("/api/v1/hmm/predict", response_model=HmmResponse)
-def get_latest_hmm_score(symbol: str = "BTCUSDT"):
+def get_latest_hmm_score(symbol: str = "BTC/USDT"):
     now_utc = datetime.datetime.now(datetime.timezone.utc)
     aligned_hour = (now_utc.hour // 4) * 4
     aligned_utc = now_utc.replace(hour=aligned_hour, minute=0, second=0, microsecond=0)

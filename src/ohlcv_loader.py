@@ -4,6 +4,7 @@ from config import HMM_CONFIG
 
 def load_ohlcv(symbol: str) -> list:
   exchange = ccxt.binance({'enableRateLimit': True})
+  formatted_symbol = symbol.replace("/", "") if "/" in symbol else symbol
   
   now_utc = datetime.datetime.now(datetime.timezone.utc)
   start_ts = int((now_utc - datetime.timedelta(days=HMM_CONFIG['FETCH_DAYS'])).timestamp() * 1000)
@@ -14,7 +15,7 @@ def load_ohlcv(symbol: str) -> list:
   
   while current_ts < end_ts:
       try:
-          ohlcv = exchange.fetch_ohlcv(symbol, HMM_CONFIG['TIMEFRAME'], since=current_ts, limit=1000)
+          ohlcv = exchange.fetch_ohlcv(formatted_symbol, HMM_CONFIG['TIMEFRAME'], since=current_ts, limit=1000)
           if not ohlcv:
               break
           all_ohlcv.extend(ohlcv)
