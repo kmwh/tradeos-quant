@@ -134,26 +134,11 @@ agent_engine = workflow.compile()
 
 # 진입점
 def analyze_trading_performance(request: PerformanceRequest):
-    raw_journals = [j.model_dump() for j in request.journals]
-    regime_stats = calculate_hmm_regime(raw_journals)
-    
-    cleaned_journals = [
-        {
-            "ticker": j.get("ticker"),
-            "position": j.get("position"),
-            "leverage": j.get("leverage"),
-            "entry_reason": j.get("entry_reason"),
-            "exit_reason": j.get("exit_reason"),
-            "emotion": j.get("emotion"),
-            "pnl": j.get("pnl"),
-            "roi": j.get("roi"),
-            "duration_seconds": j.get("duration_seconds"),
-            "hmm_score": j.get("hmm_score")
-        } for j in raw_journals
-    ]
+    journals = [j.model_dump() for j in request.journals]
+    regime_stats = calculate_hmm_regime(journals)
     
     initial_state: AgentState = {
-        "journals": cleaned_journals,
+        "journals": journals,
         "regime_data": regime_stats,
         "request_meta": {
             "historical_win_rate": request.historical_win_rate,
