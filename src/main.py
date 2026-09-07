@@ -29,7 +29,7 @@ def get_latest_hmm_score(symbol: str = "BTC/USDT"):
     )
 
 @app.post("/api/v1/ai/report")
-def analyze_performance(request: PerformanceRequest):
+async def analyze_performance(request: PerformanceRequest):
     try:
         summary = analyze_trading_performance(request)
         return {"summary_text": summary}
