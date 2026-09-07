@@ -21,6 +21,7 @@ class AgentState(TypedDict):
 # 전역 LLM 인스턴스
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.1)
 
+HMM_TREND_THRESHOLD = 60
 
 # 계산 함수
 def calc_win_rate(trades: List[Dict[str, Any]]):
@@ -29,15 +30,15 @@ def calc_win_rate(trades: List[Dict[str, Any]]):
     return round((wins / len(trades)) * 100, 2)
 
 def calculate_hmm_regime(journals: List[Dict[str, Any]]):
-    trend_trades = [j for j in journals if j.get("hmm_score", 50) > 60]
-    chop_trades = [j for j in journals if j.get("hmm_score", 50) <= 60]
+    trend_trades = [j for j in journals if j.get("hmm_score", 50) > HMM_TREND_THRESHOLD]
+    chop_trades = [j for j in journals if j.get("hmm_score", 50) <= HMM_TREND_THRESHOLD]
     return {
         "trend_market": {"trade_count": len(trend_trades), "win_rate": calc_win_rate(trend_trades)},
         "chop_market": {"trade_count": len(chop_trades), "win_rate": calc_win_rate(chop_trades)}
     }
 
 
-# LangGraph 전문가 노드 정의
+# 전문가 노드 정의
 def risk_manager_node(state: AgentState):
     """수치적 리스크, 레버리지 및 자산 변동성 분석"""
     meta = state["request_meta"]
@@ -64,8 +65,8 @@ def technical_analyst_node(state: AgentState):
 HMM 기반 시장 국면 통계와 매매 기록의 진입/청산 근거를 바탕으로 사용자의 기술적 매매 성향을 분석하세요.
 
 [시장 국면(HMM) 통계]
-- 추세장(HMM > 60): 매매 {regime['trend_market']['trade_count']}회, 승률: {regime['trend_market']['win_rate']}%
-- 비추세장(HMM <= 60): 매매 {regime['chop_market']['trade_count']}회, 승률: {regime['chop_market']['win_rate']}%
+- 추세장(HMM > {HMM_TREND_THRESHOLD}): 매매 {regime['trend_market']['trade_count']}회, 승률: {regime['trend_market']['win_rate']}%
+- 비추세장(HMM <= {HMM_TREND_THRESHOLD}): 매매 {regime['chop_market']['trade_count']}회, 승률: {regime['chop_market']['win_rate']}%
 
 종목별 특성과 매매 방향(position: LONG/SHORT)이 시장 국면(hmm_score)과 어떻게 맞아떨어졌는지 대조하고, 트레이더가 진입/청산 근거(SMC, ICT, 엘리어트 파동, 피보나치 등)의 기술적 원칙을 올바르게 고수했는지 철저히 분석하세요."""
 
@@ -115,9 +116,8 @@ def synthesizer_node(state: AgentState):
     return {"final_report": response.content}
 
 
-# LangGraph 워크플로우 그래프
+# 워크플로우 정의
 workflow = StateGraph(AgentState)
-
 workflow.add_node("risk_manager", risk_manager_node)
 workflow.add_node("technical_analyst", technical_analyst_node)
 workflow.add_node("psychology_coach", psychology_coach_node)
@@ -133,7 +133,10 @@ agent_engine = workflow.compile()
 
 
 # 진입점
-def analyze_trading_performance(request: PerformanceRequest):
+def analyze_trading_performance(request: PerformanceRequest):                                   
+    if not request.journals:
+        return "분석할 매매 기록이 존재하지 않습니다."
+    
     journals = [j.model_dump() for j in request.journals]
     regime_stats = calculate_hmm_regime(journals)
     
