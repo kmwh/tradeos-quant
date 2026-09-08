@@ -31,7 +31,7 @@ def get_latest_hmm_score(symbol: str = "BTC/USDT"):
 @app.post("/api/v1/ai/report")
 async def analyze_performance(request: PerformanceRequest):
     try:
-        summary = analyze_trading_performance(request)
+        summary = await analyze_trading_performance(request)
         return {"summary_text": summary}
     except Exception as e:
         print(f"AI Analysis Failed: {e}")

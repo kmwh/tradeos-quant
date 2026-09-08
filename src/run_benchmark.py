@@ -15,10 +15,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.callbacks import BaseCallbackHandler
+from typing import TypedDict, List, Dict, Any
+from langgraph.graph import StateGraph, START, END
 from schemas import PerformanceRequest
 from mock_data import get_benchmark_dataset
-from ai_service import calculate_hmm_regime, agent_engine, HMM_TREND_THRESHOLD
-from prompts import SINGLE_PROMPT_SYSTEM
+from ai_service import calculate_hmm_regime, HMM_TREND_THRESHOLD
+from prompts import (
+    SINGLE_PROMPT_SYSTEM,
+    RISK_MANAGER_SYSTEM,
+    TECHNICAL_ANALYST_SYSTEM,
+    PSYCHOLOGY_COACH_SYSTEM,
+    SYNTHESIZER_SYSTEM
+)
 
 MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 llm = ChatGoogleGenerativeAI(model=MODEL_NAME, temperature=0.1)
@@ -92,6 +100,66 @@ async def test_single(data: PerformanceRequest):
         "total_tok": in_t + out_t,
         "report_text": to_clean_text(res.content)
     }
+
+class AgentState(TypedDict):
+    journals: List[Dict[str, Any]]
+    regime_data: Dict[str, Any]
+    request_meta: Dict[str, Any]
+    risk_analysis: str
+    technical_analysis: str
+    psychology_analysis: str
+    final_report: str
+
+async def risk_manager_node(state: AgentState):
+    meta = state["request_meta"]
+    sys_prompt = RISK_MANAGER_SYSTEM.format(
+        hist_win=meta['historical_win_rate'], hist_pnl=meta['historical_avg_pnl'],
+        batch_win=meta['batch_win_rate'], batch_pnl=meta['batch_avg_pnl']
+    )
+    user_msg = f"매매 저널 데이터:\n{json.dumps(state['journals'], ensure_ascii=False)}"
+    res = await llm.ainvoke([SystemMessage(content=sys_prompt), HumanMessage(content=user_msg)])
+    return {"risk_analysis": res.content}
+
+async def technical_analyst_node(state: AgentState):
+    regime = state["regime_data"]
+    sys_prompt = TECHNICAL_ANALYST_SYSTEM.format(
+        hmm_threshold=HMM_TREND_THRESHOLD,
+        trend_cnt=regime['trend_market']['trade_count'], trend_win=regime['trend_market']['win_rate'],
+        chop_cnt=regime['chop_market']['trade_count'], chop_win=regime['chop_market']['win_rate']
+    )
+    user_msg = f"매매 저널 데이터:\n{json.dumps(state['journals'], ensure_ascii=False)}"
+    res = await llm.ainvoke([SystemMessage(content=sys_prompt), HumanMessage(content=user_msg)])
+    return {"technical_analysis": res.content}
+
+async def psychology_coach_node(state: AgentState):
+    user_msg = f"매매 저널 데이터:\n{json.dumps(state['journals'], ensure_ascii=False)}"
+    res = await llm.ainvoke([SystemMessage(content=PSYCHOLOGY_COACH_SYSTEM), HumanMessage(content=user_msg)])
+    return {"psychology_analysis": res.content}
+
+async def synthesizer_node(state: AgentState):
+    expert_inputs = (
+        f"[리스크 분석]\n{state['risk_analysis']}\n\n"
+        f"[기술적 분석]\n{state['technical_analysis']}\n\n"
+        f"[심리 코칭 분석]\n{state['psychology_analysis']}"
+    )
+    res = await llm.ainvoke([SystemMessage(content=SYNTHESIZER_SYSTEM), HumanMessage(content=expert_inputs)])
+    return {"final_report": res.content}
+
+_workflow = StateGraph(AgentState)
+_workflow.add_node("risk_manager", risk_manager_node)
+_workflow.add_node("technical_analyst", technical_analyst_node)
+_workflow.add_node("psychology_coach", psychology_coach_node)
+_workflow.add_node("synthesizer", synthesizer_node)
+
+_workflow.add_edge(START, "risk_manager")
+_workflow.add_edge(START, "technical_analyst")
+_workflow.add_edge(START, "psychology_coach")
+_workflow.add_edge("risk_manager", "synthesizer")
+_workflow.add_edge("technical_analyst", "synthesizer")
+_workflow.add_edge("psychology_coach", "synthesizer")
+_workflow.add_edge("synthesizer", END)
+
+agent_engine = _workflow.compile()
 
 # 2. 멀티 에이전트 Fan-Out 병렬 실행 시나리오 (LangGraph DAG)
 async def test_parallel(data: PerformanceRequest):
